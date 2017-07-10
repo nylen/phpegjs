@@ -83,5 +83,10 @@
         "rule": "Chinese_Character",
         "value": "鱼"
     },
+    "\n",
+    {
+        "rule": "Pile_Of_Poo",
+        "value": "💩"
+    },
     "\n"
 ]
