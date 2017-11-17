@@ -102,7 +102,7 @@ class php52_compat_Parser {
 
 
     private function text() {
-      return substr($this->input, $this->peg_reportedPos, $this->peg_reportedPos + $this->peg_currPos);
+      return $this->input_substr($this->peg_reportedPos, $this->peg_currPos - $this->peg_reportedPos);
     }
 
     private function offset() {
