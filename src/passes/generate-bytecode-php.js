@@ -29,9 +29,7 @@
  * 
  */
 
-var arrayUtils = require("pegjs/lib/utils/arrays"),
-    objectUtils = require("pegjs/lib/utils/objects"),
-    js = require("pegjs/lib/compiler/js"),
+var js = require("pegjs/lib/compiler/js"),
     asts = require("pegjs/lib/compiler/asts"),
     visitor = require("pegjs/lib/compiler/visitor"),
     op    = require("pegjs/lib/compiler/opcodes"),
@@ -231,7 +229,7 @@ module.exports = function(ast, options) {
   var functions = [];
 
   function addConst(value) {
-    var index = arrayUtils.indexOf(consts, function(c) { return c === value; });
+    var index = consts.findIndex(function(c) { return c === value; });
 
     return index === -1 ? consts.push(value) - 1 : index;
   }
@@ -251,11 +249,21 @@ module.exports = function(ast, options) {
       first = false;
     }
 
-    var index = arrayUtils.indexOf( functions, function( c ) {
+    var index = functions.findIndex(function( c ) {
       return c.params === value.params && c.code === value.code;
     } );
 
     return index === -1 ? functions.push(value) - 1 : index;
+  }
+
+  function cloneEnv(env) {
+    let clone = {};
+
+    Object.keys(env).forEach(name => {
+      clone[name] = env[name];
+    });
+
+    return clone;
   }
 
   function buildSequence() {
@@ -275,7 +283,7 @@ module.exports = function(ast, options) {
   }
 
   function buildCall(functionIndex, delta, env, sp) {
-    var params = arrayUtils.map( objectUtils.values(env), function(p) { return sp - p; });
+    var params = Object.keys(env).map(function(name) { return sp - env[name]; });
 
     return [op.CALL, functionIndex, delta, params.length].concat(params);
   }
@@ -286,7 +294,7 @@ module.exports = function(ast, options) {
       [op.SILENT_FAILS_ON],
       generate(expression, {
         sp:     context.sp + 1,
-        env:    objectUtils.clone(context.env),
+        env:    cloneEnv(context.env),
         action: null
       }),
       [op.SILENT_FAILS_OFF],
@@ -295,7 +303,7 @@ module.exports = function(ast, options) {
         buildSequence(
           [op.POP],
           [negative ? op.POP : op.POP_CURR_POS],
-          [op.PUSH_UNDEFINED]
+          [op.PUSH_NULL]
         ),
         buildSequence(
           [op.POP],
@@ -307,7 +315,7 @@ module.exports = function(ast, options) {
   }
 
   function buildSemanticPredicate(code, negative, context) {
-    var functionIndex  = addFunctionConst(objectUtils.keys(context.env), code);
+    var functionIndex  = addFunctionConst(Object.keys(context.env), code);
 
     return buildSequence(
       [op.UPDATE_SAVED_POS],
@@ -316,11 +324,11 @@ module.exports = function(ast, options) {
         [op.IF],
         buildSequence(
           [op.POP],
-          negative ? [op.PUSH_FAILED] : [op.PUSH_UNDEFINED]
+          negative ? [op.PUSH_FAILED] : [op.PUSH_NULL]
         ),
         buildSequence(
           [op.POP],
-          negative ? [op.PUSH_UNDEFINED] : [op.PUSH_FAILED]
+          negative ? [op.PUSH_NULL] : [op.PUSH_FAILED]
         )
       )
     );
@@ -335,7 +343,7 @@ module.exports = function(ast, options) {
 
   var generate = visitor.build({
     grammar: function(node) {
-      arrayUtils.each(node.rules, generate);
+      node.rules.forEach(generate);
 
       node.consts = consts;
       node.functions = functions;
@@ -373,7 +381,7 @@ module.exports = function(ast, options) {
         return buildSequence(
           generate(alternatives[0], {
             sp:     context.sp,
-            env:    objectUtils.clone(context.env),
+            env:    cloneEnv(context.env),
             action: null
           }),
           alternatives.length > 1
@@ -393,7 +401,7 @@ module.exports = function(ast, options) {
     },
 
     action: function(node, context) {
-      var env            = objectUtils.clone(context.env),
+      var env            = cloneEnv(context.env),
           emitCall       = node.expression.type !== "sequence"
                         || node.expression.elements.length === 0,
           expressionCode = generate(node.expression, {
@@ -401,7 +409,7 @@ module.exports = function(ast, options) {
             env:    env,
             action: node
           }),
-          functionIndex  = addFunctionConst(objectUtils.keys(env), node.code);
+          functionIndex  = addFunctionConst(Object.keys(env), node.code);
   
       return emitCall
         ? buildSequence(
@@ -450,7 +458,7 @@ module.exports = function(ast, options) {
         } else {
           if (context.action) {
             functionIndex = addFunctionConst(
-              objectUtils.keys(context.env),
+              Object.keys(context.env),
               context.action.code
             );
 
@@ -485,7 +493,7 @@ module.exports = function(ast, options) {
     },
 
     labeled: function(node, context) {
-      var env = objectUtils.clone(context.env);
+      var env = cloneEnv(context.env);
 
       context.env[node.label] = context.sp + 1;
 
@@ -501,7 +509,7 @@ module.exports = function(ast, options) {
         [op.PUSH_CURR_POS],
         generate(node.expression, {
           sp:     context.sp + 1,
-          env:    objectUtils.clone(context.env),
+          env:    cloneEnv(context.env),
           action: null
         }),
         buildCondition(
@@ -524,7 +532,7 @@ module.exports = function(ast, options) {
       return buildSequence(
         generate(node.expression, {
           sp:     context.sp,
-          env:    objectUtils.clone(context.env),
+          env:    cloneEnv(context.env),
           action: null
         }),
         buildCondition(
@@ -538,7 +546,7 @@ module.exports = function(ast, options) {
     zero_or_more: function(node, context) {
       var expressionCode  = generate(node.expression, {
             sp:     context.sp + 1,
-            env:    objectUtils.clone(context.env),
+            env:    cloneEnv(context.env),
             action: null
           });
 
@@ -553,7 +561,7 @@ module.exports = function(ast, options) {
     one_or_more: function(node, context) {
       var expressionCode  = generate(node.expression, {
             sp:     context.sp + 1,
-            env:    objectUtils.clone(context.env),
+            env:    cloneEnv(context.env),
             action: null
           });
 
@@ -571,7 +579,7 @@ module.exports = function(ast, options) {
     group: function(node, context) {
       return generate(node.expression, {
         sp:     context.sp,
-        env:    objectUtils.clone(context.env),
+        env:    cloneEnv(context.env),
         action: null
       });
     },
@@ -697,7 +705,7 @@ module.exports = function(ast, options) {
       if (node.parts.length > 0) {
         regexp = '/^['
           + (node.inverted ? '^' : '')
-          + arrayUtils.map(node.parts, function(part) {
+          + node.parts.map(function(part) {
               return part instanceof Array
                 ? quoteForPhpRegexp(part[0])
                   + '-'
@@ -724,7 +732,7 @@ module.exports = function(ast, options) {
         regexpIndex = addConst(quotePhp(regexp));
       } else {
         var classArray = 'array('
-          + arrayUtils.map(node.parts, function(part) {
+          + node.parts.map(function(part) {
             if (!(part instanceof Array)) {
               part = [part, part];
             }
@@ -736,7 +744,7 @@ module.exports = function(ast, options) {
         regexpIndex = addConst(classArray);
       }
 
-      var rawText = '[' + arrayUtils.map(node.parts, function(part) {
+      var rawText = '[' + node.parts.map(function(part) {
         if ( typeof part === 'string' ) {
           return part;
         }
