@@ -22,8 +22,7 @@
  *   SOFTWARE.
  */
 
-var arrayUtils = require("pegjs/lib/utils/arrays"),
-    asts = require("pegjs/lib/compiler/asts"),
+var asts = require("pegjs/lib/compiler/asts"),
     op = require("pegjs/lib/compiler/opcodes"),
     internalUtils = require("../utils");
 
@@ -68,26 +67,21 @@ module.exports = function(ast, options) {
     }
 
     function generateTablesDeclaration() {
-        return arrayUtils.map(
-            ast.consts,
-            function(c, i) {
-                return 'private $peg_c' + i + ';';
-            }
+        return ast.consts.map(function(c, i) {
+                    return 'private $peg_c' + i + ';';
+                }
         ).join('\n');
     }
 
     function generateTablesDefinition() {
-        return arrayUtils.map(
-            ast.consts,
-            function(c, i) {
-                return '$this->peg_c' + i + ' = ' + c + ';';
-            }
+        return ast.consts.map(function(c, i) {
+                    return '$this->peg_c' + i + ' = ' + c + ';';
+                }
         ).join('\n');
     }
 
     function generateFunctions() {
-        return arrayUtils.map(
-            ast.functions,
+        return ast.functions.map(
             function( c, i ) {
                 return 'private function peg_f' + i
                     + '(' + c.params + ') {'
@@ -150,13 +144,16 @@ module.exports = function(ast, options) {
                 return code;
             },
             pop: function() {
-                var n, values;
+                var n, sp, values;
 
                 if (arguments.length === 0) {
                     return s(this.sp--);
                 } else {
                     n = arguments[0];
-                    values = arrayUtils.map(arrayUtils.range(this.sp - n + 1, this.sp + 1), s);
+                    sp = this.sp;
+                    values = Array.from(new Array(n), function (value, index) {
+                        return s(sp - n + 1 + index);
+                    });
                     this.sp -= n;
 
                     return values;
@@ -238,10 +235,7 @@ module.exports = function(ast, options) {
                 var params = bc.slice(ip + baseLength, ip + baseLength + paramsLength);
                 var value = f(bc[ip + 1]) + '(';
                 if (params.length > 0) {
-                    value +=  arrayUtils.map(
-                        params,
-                        stackIndex
-                    ).join(', ');
+                    value +=  params.map(stackIndex).join(', ');
                 }
                 value += ')';
                 stack.pop(bc[ip + 2]);
@@ -786,7 +780,7 @@ module.exports = function(ast, options) {
     parts.push(indent4(generateFunctions()));
     parts.push('');
 
-    arrayUtils.each(ast.rules, function(rule) {
+    ast.rules.forEach(function(rule) {
         parts.push(indent4(generateRuleFunction(rule)));
         parts.push('');
     });
@@ -820,8 +814,7 @@ module.exports = function(ast, options) {
     parts.push('');
 
     startRuleFunctions = 'array( '
-            + arrayUtils.map(
-                    options.allowedStartRules,
+            + options.allowedStartRules.map(
                     function(r) {
                         return '\'' + r + '\' => array($this, "peg_parse' + r + '")';
                     }
