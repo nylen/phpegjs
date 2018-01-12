@@ -8,7 +8,7 @@ Fork of
 
 ## Requirements
 
-* [PEG.js](http://pegjs.majda.cz/) v0.10.0 and above
+* [PEG.js](http://pegjs.majda.cz/) (known compatible with v0.10.0)
 
 Installation
 ------------
